@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: keneyamuso-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: keneyamuso_db
+      MYSQL_USER: keneyamuso
+      MYSQL_PASSWORD: keneyamuso123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - keneyamuso-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Application Spring Boot
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: keneyamuso-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/keneyamuso_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: keneyamuso
+      SPRING_DATASOURCE_PASSWORD: keneyamuso123
+      JWT_SECRET: 5JXzN8kP9mR2tV6yB3nF7qS4wE1rT8uI0oP3aS6dF9gH2jK5lM8nQ1wE4rT7yU0i
+    ports:
+      - "8080:8080"
+    networks:
+      - keneyamuso-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  keneyamuso-network:
+    driver: bridge
+
