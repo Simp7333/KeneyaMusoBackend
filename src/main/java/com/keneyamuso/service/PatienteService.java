@@ -4,6 +4,8 @@ import com.keneyamuso.dto.response.PatienteDetailDto;
 import com.keneyamuso.dto.response.PatienteListDto;
 import com.keneyamuso.exception.ResourceNotFoundException;
 import com.keneyamuso.model.entity.*;
+import com.keneyamuso.repository.ConsultationPostnataleRepository;
+import com.keneyamuso.repository.ConsultationPrenataleRepository;
 import com.keneyamuso.repository.PatienteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +23,8 @@ import java.util.stream.Collectors;
 public class PatienteService {
 
     private final PatienteRepository patienteRepository;
+    private final ConsultationPrenataleRepository consultationPrenataleRepository;
+    private final ConsultationPostnataleRepository consultationPostnataleRepository;
 
     /**
      * Liste des patientes avec grossesse en cours
@@ -140,6 +145,50 @@ public class PatienteService {
                 ed.setNombreVaccinations(e.getVaccinations() != null ? e.getVaccinations().size() : 0);
                 ed.setNombreConsultations(e.getConsultationsPostnatales() != null ? e.getConsultationsPostnatales().size() : 0);
                 return ed;
+            }).collect(Collectors.toList()));
+        }
+        
+        // Consultations prénatales
+        // Récupérer via les grossesses de la patiente
+        List<ConsultationPrenatale> consultationsPrenatales = new ArrayList<>();
+        if (patiente.getGrossesses() != null) {
+            for (Grossesse grossesse : patiente.getGrossesses()) {
+                if (grossesse.getConsultationsPrenatales() != null) {
+                    consultationsPrenatales.addAll(grossesse.getConsultationsPrenatales());
+                }
+            }
+        }
+        if (!consultationsPrenatales.isEmpty()) {
+            dto.setConsultationsPrenatales(consultationsPrenatales.stream().map(cpn -> {
+                PatienteDetailDto.ConsultationPrenataleDetail cpnDto = new PatienteDetailDto.ConsultationPrenataleDetail();
+                cpnDto.setId(cpn.getId());
+                cpnDto.setDatePrevue(cpn.getDatePrevue());
+                cpnDto.setDateRealisee(cpn.getDateRealisee());
+                cpnDto.setStatut(cpn.getStatut() != null ? cpn.getStatut().name() : null);
+                if (cpn.getSuiviConsultation() != null) {
+                    cpnDto.setPoids(cpn.getSuiviConsultation().getPoids());
+                    cpnDto.setTensionArterielle(cpn.getSuiviConsultation().getTensionArterielle());
+                    cpnDto.setHauteurUterine(cpn.getSuiviConsultation().getHauteurUterine());
+                }
+                cpnDto.setNotes(cpn.getNotes());
+                return cpnDto;
+            }).collect(Collectors.toList()));
+        }
+        
+        // Consultations postnatales
+        List<ConsultationPostnatale> consultationsPostnatales = consultationPostnataleRepository
+                .findByPatienteId(patiente.getId());
+        if (consultationsPostnatales != null && !consultationsPostnatales.isEmpty()) {
+            dto.setConsultationsPostnatales(consultationsPostnatales.stream().map(cpon -> {
+                PatienteDetailDto.ConsultationPostnataleDetail cponDto = new PatienteDetailDto.ConsultationPostnataleDetail();
+                cponDto.setId(cpon.getId());
+                cponDto.setType(cpon.getType());
+                cponDto.setDatePrevue(cpon.getDatePrevue());
+                cponDto.setDateRealisee(cpon.getDateRealisee());
+                cponDto.setStatut(cpon.getStatut() != null ? cpon.getStatut().name() : null);
+                cponDto.setNotesMere(cpon.getNotesMere());
+                cponDto.setNotesNouveauNe(cpon.getNotesNouveauNe());
+                return cponDto;
             }).collect(Collectors.toList()));
         }
         

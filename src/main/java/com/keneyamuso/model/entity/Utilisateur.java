@@ -56,6 +56,9 @@ public class Utilisateur {
     @Column(nullable = false)
     private Boolean actif = true;
 
+    @Column(length = 500)
+    private String photoProfil; // URL de la photo de profil
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime dateCreation;

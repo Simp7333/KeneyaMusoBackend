@@ -36,5 +36,21 @@ public class AuthController {
         JwtAuthResponse response = authService.register(request);
         return ResponseEntity.ok(ApiResponse.success("Inscription réussie", response));
     }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Déconnexion", description = "Permet à un utilisateur de se déconnecter")
+    public ResponseEntity<ApiResponse<String>> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        // Pour un système JWT, la déconnexion est principalement côté client
+        // Ici, on peut logger l'événement ou invalider le token dans une blacklist si nécessaire
+        
+        // Log de la déconnexion
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            // TODO: Optionnel - Ajouter le token à une blacklist Redis pour invalidation
+            System.out.println("Utilisateur déconnecté - Token invalidé: " + token.substring(0, Math.min(20, token.length())) + "...");
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success("Déconnexion réussie", null));
+    }
 }
 

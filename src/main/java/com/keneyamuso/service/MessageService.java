@@ -147,4 +147,18 @@ public class MessageService {
         message.setLu(true);
         messageRepository.save(message);
     }
+
+    /**
+     * Récupère tous les messages non lus d'un utilisateur.
+     * 
+     * Cette méthode retourne tous les messages reçus (non envoyés par l'utilisateur)
+     * qui n'ont pas encore été marqués comme lus.
+     * 
+     * @param utilisateurId L'identifiant de l'utilisateur
+     * @return La liste des messages non lus triés par date (plus récents en premier)
+     */
+    @Transactional(readOnly = true)
+    public List<Message> getMessagesNonLusByUtilisateurId(Long utilisateurId) {
+        return messageRepository.findUnreadMessagesByUtilisateurId(utilisateurId);
+    }
 }

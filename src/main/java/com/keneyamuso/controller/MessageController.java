@@ -3,8 +3,11 @@ package com.keneyamuso.controller;
 import com.keneyamuso.dto.request.MessageRequest;
 import com.keneyamuso.dto.response.ApiResponse;
 import com.keneyamuso.dto.response.MessageDto;
+import com.keneyamuso.exception.ResourceNotFoundException;
 import com.keneyamuso.model.entity.Message;
+import com.keneyamuso.model.entity.Utilisateur;
 import com.keneyamuso.model.enums.MessageType;
+import com.keneyamuso.repository.UtilisateurRepository;
 import com.keneyamuso.service.MessageService;
 import com.keneyamuso.service.file.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,6 +42,7 @@ public class MessageController {
 
     private final MessageService messageService;
     private final FileStorageService fileStorageService;
+    private final UtilisateurRepository utilisateurRepository;
 
 
     @PostMapping
@@ -158,6 +162,37 @@ public class MessageController {
     public ResponseEntity<ApiResponse<String>> marquerCommeLu(@PathVariable Long id) {
         messageService.marquerCommeLu(id);
         return ResponseEntity.ok(ApiResponse.success("Message marqué comme lu", null));
+    }
+
+    @GetMapping("/non-lus")
+    @Operation(summary = "Obtenir les messages non lus", 
+               description = "Récupère tous les messages non lus de l'utilisateur connecté")
+    public ResponseEntity<ApiResponse<List<MessageDto>>> getMessagesNonLus(
+            Authentication authentication) {
+        String telephone = authentication.getName();
+        Utilisateur utilisateur = utilisateurRepository.findByTelephone(telephone)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", "telephone", telephone));
+        
+        List<Message> messages = messageService.getMessagesNonLusByUtilisateurId(utilisateur.getId());
+        
+        // Mapper vers DTOs
+        List<MessageDto> messageDtos = messages.stream()
+                .map(m -> MessageDto.builder()
+                        .id(m.getId())
+                        .type(m.getType())
+                        .contenu(m.getContenu())
+                        .fileUrl(m.getFileUrl())
+                        .conversationId(m.getConversationId())
+                        .expediteurId(m.getExpediteurId())
+                        .expediteurNom(m.getExpediteurNom())
+                        .expediteurPrenom(m.getExpediteurPrenom())
+                        .expediteurTelephone(m.getExpediteurTelephone())
+                        .lu(m.getLu())
+                        .timestamp(m.getTimestamp())
+                        .build())
+                .toList();
+        
+        return ResponseEntity.ok(ApiResponse.success("Messages non lus trouvés", messageDtos));
     }
 }
 

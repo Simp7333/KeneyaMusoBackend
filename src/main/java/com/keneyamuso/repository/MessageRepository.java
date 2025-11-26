@@ -36,5 +36,18 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT COUNT(m) FROM Message m WHERE m.conversation.id = :conversationId AND m.lu = false AND m.expediteur.id != :utilisateurId")
     Long countUnreadMessages(@Param("conversationId") Long conversationId, 
                              @Param("utilisateurId") Long utilisateurId);
+    
+    /**
+     * Récupère tous les messages non lus d'un utilisateur (messages reçus, pas envoyés)
+     */
+    @Query("SELECT DISTINCT m FROM Message m " +
+           "LEFT JOIN FETCH m.conversation c " +
+           "LEFT JOIN FETCH m.expediteur e " +
+           "JOIN c.participants p " +
+           "WHERE m.lu = false " +
+           "AND m.expediteur.id != :utilisateurId " +
+           "AND p.id = :utilisateurId " +
+           "ORDER BY m.timestamp DESC")
+    List<Message> findUnreadMessagesByUtilisateurId(@Param("utilisateurId") Long utilisateurId);
 }
 

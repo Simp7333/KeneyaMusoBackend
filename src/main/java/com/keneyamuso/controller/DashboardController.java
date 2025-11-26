@@ -10,10 +10,12 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -70,7 +72,24 @@ public class DashboardController {
         );
     }
 
-    // 3. ASSIGNER UNE PATIENTE
+    // 3. STATISTIQUES ADMIN
+    @GetMapping("/admin")
+    @Operation(
+            summary = "Statistiques du tableau de bord administrateur",
+            description = "Retourne les statistiques globales : total patientes, professionnels, grossesses, enfants, rappels"
+    )
+    @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAdminDashboardStats(
+            Authentication authentication) {
+        
+        Map<String, Object> stats = dashboardService.getAdminDashboardStats();
+        
+        return ResponseEntity.ok(
+                ApiResponse.success("Statistiques récupérées avec succès", stats)
+        );
+    }
+
+    // 4. ASSIGNER UNE PATIENTE
     @PostMapping("/medecin/patientes/{patienteId}/assigner")
     @Operation(
             summary = "Assigner une patiente au médecin",

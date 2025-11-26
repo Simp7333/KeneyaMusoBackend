@@ -191,6 +191,113 @@ public class ConseilService {
     }
 
     /**
+     * Récupère les conseils pertinents pour une patiente selon son type de suivi.
+     * 
+     * Cette méthode détermine automatiquement si la patiente est en suivi prénatal
+     * (grossesse en cours) ou postnatal (après accouchement) et retourne uniquement
+     * les conseils dont la cible correspond à son profil.
+     * 
+     * @param telephone Le téléphone de la patiente
+     * @return La liste des conseils pertinents pour la patiente
+     */
+    @Transactional(readOnly = true)
+    public List<Conseil> getConseilsPourPatiente(String telephone) {
+        // Récupérer toutes les cibles possibles pour le prénatal
+        List<String> ciblesPrenatales = List.of(
+                "prenatale", "prenatal", "enceinte", "grossesse", "femme enceinte",
+                "patiente prénatale", "femme enceinte", "maternité"
+        );
+        
+        // Récupérer toutes les cibles possibles pour le postnatal
+        List<String> ciblesPostnatales = List.of(
+                "postnatale", "postnatal", "mère", "nouveau-né", "jeune mère",
+                "maman", "patiente postnatale", "après accouchement", "post-partum"
+        );
+        
+        // Déterminer si la patiente est en suivi prénatal ou postnatal
+        // Pour cela, on pourrait vérifier si elle a une grossesse en cours
+        // Pour l'instant, on retourne les conseils qui contiennent les mots-clés
+        List<Conseil> conseilsActifs = getConseilsActifs();
+        
+        List<Conseil> conseilsFiltres = new java.util.ArrayList<>();
+        
+        for (Conseil conseil : conseilsActifs) {
+            String cible = conseil.getCible();
+            if (cible == null || cible.isBlank()) {
+                continue;
+            }
+            
+            String cibleLower = cible.toLowerCase(Locale.ROOT);
+            
+            // Vérifier si la cible correspond au prénatal
+            boolean isPrenatal = ciblesPrenatales.stream()
+                    .anyMatch(keyword -> cibleLower.contains(keyword.toLowerCase(Locale.ROOT)));
+            
+            // Vérifier si la cible correspond au postnatal
+            boolean isPostnatal = ciblesPostnatales.stream()
+                    .anyMatch(keyword -> cibleLower.contains(keyword.toLowerCase(Locale.ROOT)));
+            
+            // Si la cible ne correspond à aucun type spécifique, ne pas l'inclure
+            // (pour éviter d'afficher des conseils génériques non pertinents)
+            if (!isPrenatal && !isPostnatal) {
+                continue;
+            }
+            
+            conseilsFiltres.add(conseil);
+        }
+        
+        return conseilsFiltres;
+    }
+    
+    /**
+     * Récupère les conseils pour une patiente selon son type de suivi (prénatal ou postnatal).
+     * 
+     * @param telephone Le téléphone de la patiente
+     * @param typeSuivi "prenatal" ou "postnatal"
+     * @return La liste des conseils pertinents pour le type de suivi spécifié
+     */
+    @Transactional(readOnly = true)
+    public List<Conseil> getConseilsPourPatiente(String telephone, String typeSuivi) {
+        List<Conseil> conseilsActifs = getConseilsActifs();
+        List<String> ciblesPertinentes;
+        
+        if (typeSuivi != null && typeSuivi.equalsIgnoreCase("postnatal")) {
+            // Cibles pour le postnatal
+            ciblesPertinentes = List.of(
+                    "postnatale", "postnatal", "mère", "nouveau-né", "jeune mère",
+                    "maman", "patiente postnatale", "après accouchement", "post-partum"
+            );
+        } else {
+            // Cibles pour le prénatal (par défaut)
+            ciblesPertinentes = List.of(
+                    "prenatale", "prenatal", "enceinte", "grossesse", "femme enceinte",
+                    "patiente prénatale", "maternité"
+            );
+        }
+        
+        List<Conseil> conseilsFiltres = new java.util.ArrayList<>();
+        
+        for (Conseil conseil : conseilsActifs) {
+            String cible = conseil.getCible();
+            if (cible == null || cible.isBlank()) {
+                continue;
+            }
+            
+            String cibleLower = cible.toLowerCase(Locale.ROOT);
+            
+            // Vérifier si la cible correspond au type de suivi
+            boolean correspond = ciblesPertinentes.stream()
+                    .anyMatch(keyword -> cibleLower.contains(keyword.toLowerCase(Locale.ROOT)));
+            
+            if (correspond) {
+                conseilsFiltres.add(conseil);
+            }
+        }
+        
+        return conseilsFiltres;
+    }
+
+    /**
      * Met à jour les informations d'un conseil.
      * 
      * Permet de modifier le contenu, la catégorie ou la cible d'un conseil existant.

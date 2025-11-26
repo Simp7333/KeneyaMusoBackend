@@ -25,5 +25,6 @@ public class JwtAuthResponse {
     private String telephone;
     private RoleUtilisateur role;
     private LocalDate dateDeNaissance; // Pour les patientes
+    private String photoProfil; // URL de la photo de profil
 }
 

@@ -1,0 +1,31 @@
+-- Script pour créer un administrateur par défaut
+-- 
+-- ⚠️ ATTENTION: Ce script nécessite un hash BCrypt valide.
+-- 
+-- RECOMMANDATION: Utilisez plutôt l'endpoint API pour créer l'admin:
+-- POST http://localhost:8080/api/init/create-default-admin
+-- 
+-- Ou exécutez la classe BCryptHashGenerator.java pour générer un hash valide,
+-- puis remplacez le hash ci-dessous.
+--
+-- Mot de passe par défaut: admin123
+-- Téléphone: +22370123456
+
+-- DÉCOMMENTEZ ET UTILISEZ CE SCRIPT UNIQUEMENT SI VOUS AVEZ UN HASH BCrypt VALIDE
+-- INSERT INTO utilisateurs (nom, prenom, telephone, mot_de_passe, role, langue, actif, date_creation, date_modification)
+-- VALUES (
+--     'Admin',
+--     'Système',
+--     '+22370123456',
+--     'VOTRE_HASH_BCRYPT_ICI', -- Générez avec BCryptHashGenerator.java
+--     'ADMINISTRATEUR',
+--     'fr',
+--     true,
+--     NOW(),
+--     NOW()
+-- )
+-- ON CONFLICT (telephone) DO NOTHING;
+
+-- Pour créer l'admin via l'API (RECOMMANDÉ):
+-- curl -X POST http://localhost:8080/api/init/create-default-admin
+

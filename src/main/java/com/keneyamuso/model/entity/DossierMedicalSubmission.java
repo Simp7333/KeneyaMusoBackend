@@ -41,7 +41,7 @@ public class DossierMedicalSubmission {
     private SubmissionStatus status = SubmissionStatus.EN_ATTENTE;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String payload;
 
     @Column(columnDefinition = "TEXT")

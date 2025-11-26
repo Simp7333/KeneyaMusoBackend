@@ -2,6 +2,7 @@ package com.keneyamuso.repository;
 
 import com.keneyamuso.model.entity.ConsultationPrenatale;
 import com.keneyamuso.model.enums.StatutConsultation;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,7 +25,8 @@ public interface ConsultationPrenataleRepository extends JpaRepository<Consultat
     List<ConsultationPrenatale> findConsultationsByDateRange(@Param("startDate") LocalDate startDate, 
                                                                @Param("endDate") LocalDate endDate);
     
-    @Query("SELECT c FROM ConsultationPrenatale c WHERE c.grossesse.patiente.id = :patienteId")
+    @Query("SELECT c FROM ConsultationPrenatale c JOIN FETCH c.grossesse g WHERE g.patiente.id = :patienteId")
+    @EntityGraph(attributePaths = {"grossesse"})
     List<ConsultationPrenatale> findByPatienteId(@Param("patienteId") Long patienteId);
     
     // === MÉTHODE POUR LE SYSTÈME DE RAPPELS ===

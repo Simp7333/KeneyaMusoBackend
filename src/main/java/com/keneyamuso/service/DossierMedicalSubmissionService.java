@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,21 +41,74 @@ public class DossierMedicalSubmissionService {
         Patiente patiente = patienteRepository.findById(patienteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patiente", "id", patienteId));
 
-        return createSubmission(patiente, type, data);
+        return createSubmission(patiente, type, data, null);
     }
 
     @Transactional
     public DossierMedicalSubmission createSubmissionForTelephone(String telephone, SubmissionType type, JsonNode data) {
         Patiente patiente = patienteRepository.findByTelephone(telephone)
                 .orElseThrow(() -> new ResourceNotFoundException("Patiente", "telephone", telephone));
-        return createSubmission(patiente, type, data);
+        return createSubmission(patiente, type, data, null);
     }
 
-    private DossierMedicalSubmission createSubmission(Patiente patiente, SubmissionType type, JsonNode data) {
-        // Permettre les soumissions même sans médecin assigné
-        // Si la patiente a un médecin, l'assigner automatiquement
-        // Sinon, la soumission sera sans médecin et visible par tous les médecins
-        ProfessionnelSante medecin = patiente.getProfessionnelSanteAssigne();
+    @Transactional
+    public DossierMedicalSubmission createSubmissionForTelephone(String telephone, SubmissionType type, JsonNode data, String medecinTelephone) {
+        Patiente patiente = patienteRepository.findByTelephone(telephone)
+                .orElseThrow(() -> new ResourceNotFoundException("Patiente", "telephone", telephone));
+        return createSubmission(patiente, type, data, medecinTelephone);
+    }
+
+    private String normalizeTelephone(String telephone) {
+        if (telephone == null || telephone.isBlank()) {
+            return null;
+        }
+        // Retirer les espaces et autres caractères non numériques sauf le + au début
+        return telephone.trim().replaceAll("\\s+", "");
+    }
+
+    private DossierMedicalSubmission createSubmission(Patiente patiente, SubmissionType type, JsonNode data, String medecinTelephone) {
+        ProfessionnelSante medecin = null;
+        
+        log.info("📝 Création de soumission - Patiente ID: {}, Type: {}, Médecin téléphone: {}", 
+                patiente.getId(), type, medecinTelephone != null ? medecinTelephone : "null");
+        
+        // Priorité 1: Si un médecin est spécifié dans la requête, l'utiliser
+        if (medecinTelephone != null && !medecinTelephone.isBlank()) {
+            String normalizedTelephone = normalizeTelephone(medecinTelephone);
+            log.info("🔍 Recherche du médecin avec téléphone (normalisé): {}", normalizedTelephone);
+            
+            // Essayer d'abord avec le téléphone normalisé
+            medecin = professionnelSanteRepository.findByTelephone(normalizedTelephone)
+                    .orElse(null);
+            
+            // Si pas trouvé, essayer avec le téléphone original
+            if (medecin == null && !normalizedTelephone.equals(medecinTelephone)) {
+                log.info("🔍 Tentative avec téléphone original: {}", medecinTelephone);
+                medecin = professionnelSanteRepository.findByTelephone(medecinTelephone)
+                        .orElse(null);
+            }
+            
+            if (medecin != null) {
+                log.info("✅ Médecin trouvé: ID={}, Nom={}, Téléphone={}", 
+                        medecin.getId(), medecin.getNom() + " " + medecin.getPrenom(), medecin.getTelephone());
+            } else {
+                log.warn("⚠️ Aucun médecin trouvé avec le téléphone: {} (normalisé: {})", 
+                        medecinTelephone, normalizedTelephone);
+            }
+        }
+        
+        // Priorité 2: Sinon, utiliser le médecin assigné à la patiente
+        if (medecin == null) {
+            medecin = patiente.getProfessionnelSanteAssigne();
+            if (medecin != null) {
+                log.info("📋 Utilisation du médecin assigné à la patiente: ID={}, Nom={}", 
+                        medecin.getId(), medecin.getNom() + " " + medecin.getPrenom());
+            } else {
+                log.info("ℹ️ Aucun médecin assigné à la patiente - la soumission sera visible par tous les médecins");
+            }
+        }
+        
+        // Si aucun médecin n'est assigné, la soumission sera visible par tous les médecins (null)
 
         DossierMedicalSubmission submission = new DossierMedicalSubmission();
         submission.setPatiente(patiente);
@@ -67,24 +121,54 @@ public class DossierMedicalSubmissionService {
             throw new BadRequestException("Impossible de sérialiser les données du formulaire.");
         }
 
-        return submissionRepository.save(submission);
+        DossierMedicalSubmission savedSubmission = submissionRepository.save(submission);
+        log.info("✅ Soumission créée - ID: {}, Statut: {}, Médecin assigné: {}", 
+                savedSubmission.getId(), 
+                savedSubmission.getStatus(),
+                savedSubmission.getProfessionnelSante() != null 
+                    ? savedSubmission.getProfessionnelSante().getId().toString() 
+                    : "null (visible par tous)");
+        
+        return savedSubmission;
     }
 
     @Transactional(readOnly = true)
     public List<DossierMedicalSubmission> getPendingSubmissionsForMedecin(Long medecinId) {
+        log.info("🔍 Récupération des soumissions en attente pour le médecin ID: {}", medecinId);
+        
+        // DEBUG: Lister TOUTES les soumissions en base pour debug
+        List<DossierMedicalSubmission> allSubmissions = submissionRepository.findAll();
+        log.info("🔍 DEBUG - Total de soumissions en base: {}", allSubmissions.size());
+        for (DossierMedicalSubmission sub : allSubmissions) {
+            Long medecinIdInSub = sub.getProfessionnelSante() != null ? sub.getProfessionnelSante().getId() : null;
+            log.info("  - Soumission ID: {}, Type: {}, Statut: {}, Médecin ID: {}, Patiente ID: {}", 
+                    sub.getId(), sub.getType(), sub.getStatus(), medecinIdInSub, sub.getPatiente().getId());
+        }
+        
         // Récupérer les soumissions assignées au médecin
         List<DossierMedicalSubmission> submissionsAssigned = submissionRepository
                 .findByProfessionnelSanteIdAndStatusInOrderByDateCreationDesc(
                         medecinId,
                         List.of(SubmissionStatus.EN_ATTENTE)
                 );
+        log.info("📋 Soumissions assignées au médecin {}: {}", medecinId, submissionsAssigned.size());
+        for (DossierMedicalSubmission sub : submissionsAssigned) {
+            log.info("  - Soumission ID: {}, Type: {}, Patiente: {}", 
+                    sub.getId(), sub.getType(), sub.getPatiente().getId());
+        }
         
         // Récupérer TOUTES les soumissions sans médecin assigné (disponibles pour tous)
         List<DossierMedicalSubmission> submissionsUnassigned = submissionRepository
                 .findByProfessionnelSanteIsNullAndStatusOrderByDateCreationDesc(SubmissionStatus.EN_ATTENTE);
+        log.info("📋 Soumissions non assignées (disponibles pour tous): {}", submissionsUnassigned.size());
+        for (DossierMedicalSubmission sub : submissionsUnassigned) {
+            log.info("  - Soumission ID: {}, Type: {}, Patiente: {}", 
+                    sub.getId(), sub.getType(), sub.getPatiente().getId());
+        }
         
         // Combiner et retourner
         submissionsUnassigned.addAll(submissionsAssigned);
+        log.info("✅ Total de soumissions retournées: {}", submissionsUnassigned.size());
         return submissionsUnassigned;
     }
 
@@ -104,17 +188,25 @@ public class DossierMedicalSubmissionService {
         // Vérifier si le médecin est autorisé à traiter cette soumission
         checkMedecinAuthorization(submission, medecinId);
 
-        // Si la soumission n'a pas de médecin assigné, assigner le médecin
+        // Récupérer le médecin qui approuve
+        ProfessionnelSante medecin = professionnelSanteRepository.findById(medecinId)
+                .orElseThrow(() -> new ResourceNotFoundException("Professionnel de santé", "id", medecinId));
+        
+        // Si la soumission n'a pas de médecin assigné, l'assigner maintenant
         if (submission.getProfessionnelSante() == null) {
-            ProfessionnelSante medecin = professionnelSanteRepository.findById(medecinId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Professionnel de santé", "id", medecinId));
             submission.setProfessionnelSante(medecin);
-            
-            // Assigner le médecin à la patiente
-            Patiente patiente = submission.getPatiente();
+            log.info("Médecin {} assigné à la soumission {} après acceptation", medecinId, submissionId);
+        }
+        
+        // Assigner le médecin à la patiente (toujours lors de l'acceptation, même si déjà assigné à la soumission)
+        Patiente patiente = submission.getPatiente();
+        if (patiente.getProfessionnelSanteAssigne() == null || 
+            !patiente.getProfessionnelSanteAssigne().getId().equals(medecinId)) {
             patiente.setProfessionnelSanteAssigne(medecin);
             patienteRepository.save(patiente);
-            log.info("Médecin {} assigné automatiquement à la patiente {} après acceptation", medecinId, patiente.getId());
+            log.info("Médecin {} assigné à la patiente {} après acceptation de la soumission", medecinId, patiente.getId());
+        } else {
+            log.info("Médecin {} était déjà assigné à la patiente {}", medecinId, patiente.getId());
         }
 
         try {
@@ -212,14 +304,36 @@ public class DossierMedicalSubmissionService {
     }
 
     private void ensureDossierMedicalExists(Long patienteId) {
+        log.info("🔍 Vérification de l'existence du dossier médical pour la patiente {}", patienteId);
+        
         // Vérifier si le dossier existe déjà
-        if (dossierMedicalRepository.findByPatienteId(patienteId).isEmpty()) {
+        var dossierOptional = dossierMedicalRepository.findByPatienteId(patienteId);
+        
+        if (dossierOptional.isEmpty()) {
             // Créer le dossier s'il n'existe pas
+            log.info("📋 Aucun dossier médical trouvé. Création pour la patiente {}", patienteId);
             try {
-                dossierMedicalService.createDossierMedical(patienteId);
-            } catch (IllegalStateException ignored) {
-                // Le dossier existe déjà, ignorer l'erreur (race condition)
+                DossierMedical nouveauDossier = dossierMedicalService.createDossierMedical(patienteId);
+                log.info("✅ Dossier médical créé avec succès - ID: {} pour la patiente {}", 
+                         nouveauDossier.getId(), patienteId);
+            } catch (IllegalStateException e) {
+                // Le dossier existe déjà (race condition possible)
+                log.warn("⚠️ Le dossier médical existe déjà pour la patiente {} (race condition détectée): {}", 
+                         patienteId, e.getMessage());
+                // Vérifier à nouveau pour confirmer
+                var dossierVerif = dossierMedicalRepository.findByPatienteId(patienteId);
+                if (dossierVerif.isEmpty()) {
+                    log.error("❌ ERREUR CRITIQUE: Impossible de créer ou trouver le dossier médical pour la patiente {}", patienteId);
+                    throw new IllegalStateException("Impossible de créer le dossier médical pour la patiente " + patienteId);
+                }
+            } catch (Exception e) {
+                log.error("❌ Erreur inattendue lors de la création du dossier médical pour la patiente {}: {}", 
+                         patienteId, e.getMessage(), e);
+                throw e;
             }
+        } else {
+            log.info("✅ Dossier médical existant trouvé - ID: {} pour la patiente {}", 
+                     dossierOptional.get().getId(), patienteId);
         }
     }
 
@@ -248,9 +362,17 @@ public class DossierMedicalSubmissionService {
     }
 
     public Long getMedecinIdFromTelephone(String telephone) {
-        return professionnelSanteRepository.findByTelephone(telephone)
-                .map(ProfessionnelSante::getId)
-                .orElseThrow(() -> new ResourceNotFoundException("Professionnel", "telephone", telephone));
+        log.info("🔍 Recherche du médecin ID par téléphone: {}", telephone);
+        Optional<ProfessionnelSante> medecin = professionnelSanteRepository.findByTelephone(telephone);
+        
+        if (medecin.isPresent()) {
+            Long medecinId = medecin.get().getId();
+            log.info("✅ Médecin trouvé - ID: {}, Nom: {}", medecinId, medecin.get().getNom() + " " + medecin.get().getPrenom());
+            return medecinId;
+        } else {
+            log.error("❌ Aucun médecin trouvé avec le téléphone: {}", telephone);
+            throw new ResourceNotFoundException("Professionnel", "telephone", telephone);
+        }
     }
 
     @Transactional(readOnly = true)

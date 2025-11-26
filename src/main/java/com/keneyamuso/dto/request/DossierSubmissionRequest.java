@@ -13,6 +13,9 @@ public class DossierSubmissionRequest {
 
     @NotNull(message = "Le contenu du formulaire est obligatoire")
     private JsonNode data;
+    
+    // Téléphone du médecin auquel la patiente soumet le dossier (optionnel)
+    private String medecinTelephone;
 }
 
 

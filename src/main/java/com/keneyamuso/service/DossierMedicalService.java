@@ -1,5 +1,6 @@
 package com.keneyamuso.service;
 
+import com.keneyamuso.exception.ResourceNotFoundException;
 import com.keneyamuso.model.entity.*;
 import com.keneyamuso.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ public class DossierMedicalService {
 
     public DossierMedical createDossierMedical(Long patienteId) {
         Patiente patiente = patienteRepository.findById(patienteId)
-                .orElseThrow(() -> new RuntimeException("Patiente not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Patiente", "id", patienteId));
         if (dossierMedicalRepository.findByPatienteId(patienteId).isPresent()) {
             throw new IllegalStateException("Dossier medical already exists for this patiente");
         }
@@ -33,9 +34,14 @@ public class DossierMedicalService {
         return dossierMedicalRepository.save(dossierMedical);
     }
 
+    /**
+     * Récupère le dossier médical avec ses formulaires CPN et CPON chargés en une seule requête.
+     * Optimisé pour éviter le problème N+1.
+     */
+    @Transactional(readOnly = true)
     public DossierMedical getDossierMedicalByPatienteId(Long patienteId) {
-        return dossierMedicalRepository.findByPatienteId(patienteId)
-                .orElseThrow(() -> new RuntimeException("DossierMedical not found for this patiente"));
+        return dossierMedicalRepository.findWithFormulairesByPatienteId(patienteId)
+                .orElseThrow(() -> new ResourceNotFoundException("DossierMedical", "patienteId", patienteId));
     }
 
     public FormulaireCPN addFormulaireCPN(Long patienteId, FormulaireCPN formulaireCPN) {
@@ -57,23 +63,23 @@ public class DossierMedicalService {
 
     public SuiviConsultation addSuiviToConsultationPrenatale(Long consultationId, SuiviConsultation suivi) {
         ConsultationPrenatale consultation = consultationPrenataleRepository.findById(consultationId)
-                .orElseThrow(() -> new RuntimeException("ConsultationPrenatale not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ConsultationPrenatale", "id", consultationId));
         suivi.setConsultationPrenatale(consultation);
         return suiviConsultationRepository.save(suivi);
     }
 
     public SuiviConsultation addSuiviToConsultationPostnatale(Long consultationId, SuiviConsultation suivi) {
         ConsultationPostnatale consultation = consultationPostnataleRepository.findById(consultationId)
-                .orElseThrow(() -> new RuntimeException("ConsultationPostnatale not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ConsultationPostnatale", "id", consultationId));
         suivi.setConsultationPostnatale(consultation);
         return suiviConsultationRepository.save(suivi);
     }
 
     public Ordonnance createOrdonnanceForConsultationPrenatale(Long consultationId, Long medecinId, Ordonnance ordonnance) {
         ConsultationPrenatale consultation = consultationPrenataleRepository.findById(consultationId)
-                .orElseThrow(() -> new RuntimeException("ConsultationPrenatale not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ConsultationPrenatale", "id", consultationId));
         ProfessionnelSante medecin = professionnelSanteRepository.findById(medecinId)
-                .orElseThrow(() -> new RuntimeException("Medecin not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ProfessionnelSante", "id", medecinId));
 
         ordonnance.setConsultationPrenatale(consultation);
         ordonnance.setPatiente(consultation.getGrossesse().getPatiente());
@@ -84,9 +90,9 @@ public class DossierMedicalService {
 
     public Ordonnance createOrdonnanceForConsultationPostnatale(Long consultationId, Long medecinId, Ordonnance ordonnance) {
         ConsultationPostnatale consultation = consultationPostnataleRepository.findById(consultationId)
-                .orElseThrow(() -> new RuntimeException("ConsultationPostnatale not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ConsultationPostnatale", "id", consultationId));
         ProfessionnelSante medecin = professionnelSanteRepository.findById(medecinId)
-                .orElseThrow(() -> new RuntimeException("Medecin not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("ProfessionnelSante", "id", medecinId));
 
         ordonnance.setConsultationPostnatale(consultation);
         ordonnance.setPatiente(consultation.getPatiente());

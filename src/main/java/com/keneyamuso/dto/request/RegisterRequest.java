@@ -39,6 +39,8 @@ public class RegisterRequest {
     
     private String langue = "fr";
     
+    private String photoProfil; // URL de la photo de profil (optionnel)
+    
     // Champs spécifiques pour PATIENTE
     @Past(message = "La date de naissance doit être dans le passé")
     private LocalDate dateDeNaissance;

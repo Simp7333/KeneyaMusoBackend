@@ -60,7 +60,10 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(authentication);
 
-        Utilisateur utilisateur = utilisateurRepository.findByTelephone(request.getTelephone())
+        // Le téléphone dans l'authentification est celui de l'utilisateur trouvé par CustomUserDetailsService
+        // (qui correspond au téléphone stocké dans la base)
+        String telephone = authentication.getName();
+        Utilisateur utilisateur = utilisateurRepository.findByTelephone(telephone)
                 .orElseThrow(() -> new BadRequestException("Utilisateur non trouvé"));
 
         JwtAuthResponse.JwtAuthResponseBuilder responseBuilder = JwtAuthResponse.builder()
@@ -70,7 +73,8 @@ public class AuthService {
                 .nom(utilisateur.getNom())
                 .prenom(utilisateur.getPrenom())
                 .telephone(utilisateur.getTelephone())
-                .role(utilisateur.getRole());
+                .role(utilisateur.getRole())
+                .photoProfil(utilisateur.getPhotoProfil());
         
         // Si c'est une Patiente, ajouter la date de naissance
         if (utilisateur instanceof Patiente) {
@@ -131,7 +135,8 @@ public class AuthService {
                 .nom(utilisateur.getNom())
                 .prenom(utilisateur.getPrenom())
                 .telephone(utilisateur.getTelephone())
-                .role(utilisateur.getRole());
+                .role(utilisateur.getRole())
+                .photoProfil(utilisateur.getPhotoProfil());
         
         // Si c'est une Patiente, ajouter la date de naissance
         if (utilisateur instanceof Patiente) {
@@ -157,6 +162,7 @@ public class AuthService {
         patiente.setRole(request.getRole());
         patiente.setLangue(request.getLangue());
         patiente.setActif(true);
+        patiente.setPhotoProfil(request.getPhotoProfil());
         
         // Champs spécifiques Patiente
         patiente.setDateDeNaissance(request.getDateDeNaissance());
@@ -191,6 +197,7 @@ public class AuthService {
         professionnel.setRole(request.getRole());
         professionnel.setLangue(request.getLangue());
         professionnel.setActif(true);
+        professionnel.setPhotoProfil(request.getPhotoProfil());
         
         // Champs spécifiques ProfessionnelSante
         professionnel.setSpecialite(request.getSpecialite());
@@ -211,6 +218,7 @@ public class AuthService {
         utilisateur.setRole(request.getRole());
         utilisateur.setLangue(request.getLangue());
         utilisateur.setActif(true);
+        utilisateur.setPhotoProfil(request.getPhotoProfil());
 
         return utilisateur;
     }

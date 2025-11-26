@@ -30,7 +30,7 @@ public class DossierMedicalSubmissionController {
     private final DossierMedicalSubmissionService submissionService;
 
     @PostMapping
-    @Operation(summary = "Soumettre un dossier médical", description = "Permet à une patiente de soumettre son dossier médical au médecin assigné")
+    @Operation(summary = "Soumettre un dossier médical", description = "Permet à une patiente de soumettre son dossier médical au médecin assigné ou spécifié")
     public ResponseEntity<ApiResponse<DossierSubmissionResponse>> createSubmission(
             @Valid @RequestBody DossierSubmissionRequest request,
             Authentication authentication) {
@@ -39,7 +39,8 @@ public class DossierMedicalSubmissionController {
         DossierMedicalSubmission submission = submissionService.createSubmissionForTelephone(
                 telephone,
                 request.getType(),
-                request.getData());
+                request.getData(),
+                request.getMedecinTelephone()); // Passer le téléphone du médecin si fourni
 
         DossierSubmissionResponse response = submissionService.mapToResponse(submission);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -59,9 +60,17 @@ public class DossierMedicalSubmissionController {
     @GetMapping("/medecin")
     @Operation(summary = "Lister les soumissions en attente pour un médecin")
     public ResponseEntity<ApiResponse<List<DossierSubmissionResponse>>> getPendingForMedecin(Authentication authentication) {
-        Long medecinId = submissionService.getMedecinIdFromTelephone(authentication.getName());
+        String telephone = authentication.getName();
+        System.out.println("🔍 Récupération des alertes pour le médecin avec téléphone: " + telephone);
+        
+        Long medecinId = submissionService.getMedecinIdFromTelephone(telephone);
+        System.out.println("✅ Médecin ID trouvé: " + medecinId);
+        
         List<DossierSubmissionResponse> responses = submissionService.mapToResponses(
                 submissionService.getPendingSubmissionsForMedecin(medecinId));
+        
+        System.out.println("📋 Nombre d'alertes retournées: " + responses.size());
+        
         return ResponseEntity.ok(ApiResponse.success("Soumissions en attente", responses));
     }
 

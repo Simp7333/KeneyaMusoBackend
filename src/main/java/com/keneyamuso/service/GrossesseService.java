@@ -121,14 +121,32 @@ public class GrossesseService {
     /**
      * Récupère une grossesse par son identifiant.
      * 
+     * Vérifie également que si la grossesse est EN_COURS, elle a ses CPN générées automatiquement
+     * si elles n'existent pas encore.
+     * 
      * @param id L'identifiant unique de la grossesse
      * @return La grossesse trouvée
      * @throws ResourceNotFoundException si la grossesse n'existe pas
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Grossesse getGrossesseById(Long id) {
-        return grossesseRepository.findById(id)
+        Grossesse grossesse = grossesseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Grossesse", "id", id));
+        
+        // Si la grossesse est EN_COURS, vérifier et générer les CPN si elles n'existent pas
+        if (grossesse.getStatut() == StatutGrossesse.EN_COURS) {
+            List<ConsultationPrenatale> existingCPN = consultationPrenataleRepository
+                    .findByGrossesseId(grossesse.getId());
+            
+            // Si aucune CPN n'existe, les générer automatiquement
+            if (existingCPN == null || existingCPN.isEmpty()) {
+                if (grossesse.getDateDebut() != null) {
+                    genererConsultationsPrenatales(grossesse, grossesse.getDateDebut());
+                }
+            }
+        }
+        
+        return grossesse;
     }
 
     /**
@@ -137,12 +155,32 @@ public class GrossesseService {
      * Cette méthode retourne l'historique complet des grossesses (en cours et terminées)
      * pour une patiente donnée, triées par date de création.
      * 
+     * Vérifie également que les grossesses EN_COURS ont leurs CPN générées automatiquement
+     * si elles n'existent pas encore.
+     * 
      * @param patienteId L'identifiant de la patiente
      * @return La liste des grossesses de la patiente (peut être vide)
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Grossesse> getGrossessesByPatiente(Long patienteId) {
-        return grossesseRepository.findByPatienteId(patienteId);
+        List<Grossesse> grossesses = grossesseRepository.findByPatienteId(patienteId);
+        
+        // Pour chaque grossesse EN_COURS, vérifier et générer les CPN si elles n'existent pas
+        for (Grossesse grossesse : grossesses) {
+            if (grossesse.getStatut() == StatutGrossesse.EN_COURS) {
+                List<ConsultationPrenatale> existingCPN = consultationPrenataleRepository
+                        .findByGrossesseId(grossesse.getId());
+                
+                // Si aucune CPN n'existe, les générer automatiquement
+                if (existingCPN == null || existingCPN.isEmpty()) {
+                    if (grossesse.getDateDebut() != null) {
+                        genererConsultationsPrenatales(grossesse, grossesse.getDateDebut());
+                    }
+                }
+            }
+        }
+        
+        return grossesses;
     }
 
     /**

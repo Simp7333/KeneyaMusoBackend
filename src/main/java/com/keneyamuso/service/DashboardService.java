@@ -10,6 +10,8 @@ import com.keneyamuso.model.entity.Utilisateur;
 import com.keneyamuso.model.enums.StatutRappel;
 import com.keneyamuso.model.enums.SubmissionStatus;
 import com.keneyamuso.repository.DossierMedicalSubmissionRepository;
+import com.keneyamuso.repository.EnfantRepository;
+import com.keneyamuso.repository.GrossesseRepository;
 import com.keneyamuso.repository.PatienteRepository;
 import com.keneyamuso.repository.RappelRepository;
 import com.keneyamuso.repository.UtilisateurRepository;
@@ -28,6 +30,9 @@ public class DashboardService {
     private final PatienteRepository patienteRepository;
     private final RappelRepository rappelRepository;
     private final DossierMedicalSubmissionRepository submissionRepository;
+    private final DossierMedicalSubmissionService dossierMedicalSubmissionService;
+    private final GrossesseRepository grossesseRepository;
+    private final EnfantRepository enfantRepository;
 
     // ====================== STATS DU MÉDECIN ======================
     @Transactional(readOnly = true)
@@ -52,10 +57,15 @@ public class DashboardService {
         );
         
         // Alertes = Soumissions de dossiers en attente
-        long alertesActives = submissionRepository.countByProfessionnelSanteIdAndStatus(
+        // Utiliser la même méthode que getPendingSubmissionsForMedecin pour être cohérent
+        long alertesActives = dossierMedicalSubmissionService.countPendingForMedecin(
                 professionnelSante.getId(),
                 SubmissionStatus.EN_ATTENTE
         );
+        
+        // Logs pour debug
+        System.out.println("📊 Dashboard Stats pour médecin ID: " + professionnelSante.getId());
+        System.out.println("  - Total alertes actives: " + alertesActives);
 
         return DashboardStatsResponse.builder()
                 .totalPatientes(totalPatientes)
@@ -64,6 +74,50 @@ public class DashboardService {
                 .rappelsActifs(rappelsActifs)
                 .alertesActives(alertesActives)
                 .build();
+    }
+
+    // ====================== STATS ADMIN ======================
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAdminDashboardStats() {
+        // Total patientes
+        long totalPatientes = patienteRepository.count();
+        
+        // Total professionnels de santé
+        long totalProfessionnels = utilisateurRepository.findByRole(
+            com.keneyamuso.model.enums.RoleUtilisateur.MEDECIN
+        ).size();
+        
+        // Total grossesses en cours (utiliser le repository)
+        long totalGrossessesEnCours = grossesseRepository.findByStatut(
+            com.keneyamuso.model.enums.StatutGrossesse.EN_COURS
+        ).size();
+        
+        // Total grossesses terminées
+        long totalGrossessesTerminees = grossesseRepository.findByStatut(
+            com.keneyamuso.model.enums.StatutGrossesse.TERMINEE
+        ).size();
+        
+        // Total enfants
+        long totalEnfants = enfantRepository.count();
+        
+        // Total rappels envoyés (tous les rappels)
+        long totalRappelsEnvoyes = rappelRepository.count();
+        
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalPatientes", totalPatientes);
+        stats.put("totalProfessionnels", totalProfessionnels);
+        stats.put("totalGrossessesEnCours", totalGrossessesEnCours);
+        stats.put("totalGrossessesTerminees", totalGrossessesTerminees);
+        stats.put("totalEnfants", totalEnfants);
+        stats.put("totalRappelsEnvoyes", totalRappelsEnvoyes);
+        
+        // Pourcentage CPN respectées (calcul simplifié - à améliorer selon la logique métier)
+        // stats.put("cpnRespectRate", 78); // TODO: Calculer selon la logique métier
+        
+        // Pourcentage vaccinations à jour (calcul simplifié - à améliorer selon la logique métier)
+        // stats.put("vaccinationRate", 72); // TODO: Calculer selon la logique métier
+        
+        return stats;
     }
 
     // ====================== LISTE DES PATIENTES ======================

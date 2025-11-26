@@ -57,5 +57,14 @@ public interface PatienteRepository extends JpaRepository<Patiente, Long> {
     // Charger les enfants séparément (évite MultipleBagFetchException)
     @Query("SELECT DISTINCT p FROM Patiente p LEFT JOIN FETCH p.enfants WHERE p.id IN :ids")
     List<Patiente> findByIdInWithEnfants(@Param("ids") List<Long> ids);
+    
+    // === MÉTHODE POUR ADMIN : TOUTES LES PATIENTES AVEC RELATIONS ===
+    // Charger toutes les patientes avec grossesses (pour admin)
+    @Query("SELECT DISTINCT p FROM Patiente p LEFT JOIN FETCH p.grossesses")
+    List<Patiente> findAllWithGrossesses();
+    
+    // Charger toutes les patientes avec enfants (pour admin)
+    @Query("SELECT DISTINCT p FROM Patiente p LEFT JOIN FETCH p.enfants")
+    List<Patiente> findAllWithEnfants();
     // ================================================
 }

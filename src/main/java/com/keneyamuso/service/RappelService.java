@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -102,6 +103,17 @@ public class RappelService {
             if ("MEDECIN".equals(utilisateur.getRole())) {
                 notification.put("medecinId", utilisateur.getId());
             }
+        }
+        
+        // Ajouter les IDs des consultations/vaccinations liées
+        if (rappel.getConsultationPrenatale() != null) {
+            notification.put("consultationPrenataleId", rappel.getConsultationPrenatale().getId());
+        }
+        if (rappel.getConsultationPostnatale() != null) {
+            notification.put("consultationPostnataleId", rappel.getConsultationPostnatale().getId());
+        }
+        if (rappel.getVaccination() != null) {
+            notification.put("vaccinationId", rappel.getVaccination().getId());
         }
         
         return notification;
@@ -468,6 +480,32 @@ public class RappelService {
                 creerRappelVaccination(vaccination);
             }
         }
+    }
+
+    /**
+     * Crée un rappel manuel pour l'utilisateur connecté
+     * 
+     * @param utilisateur L'utilisateur qui crée le rappel
+     * @param titre Le titre/message du rappel
+     * @param date La date du rappel
+     * @param heure L'heure du rappel
+     * @return Le rappel créé
+     */
+    @Transactional
+    public Rappel creerRappelManuel(Utilisateur utilisateur, String titre, LocalDate date, LocalTime heure) {
+        LocalDateTime dateEnvoi = date.atTime(heure);
+        
+        Rappel rappel = new Rappel();
+        rappel.setMessage(titre);
+        rappel.setDateEnvoi(dateEnvoi);
+        rappel.setType(TypeRappel.CONSEIL); // Utiliser CONSEIL comme type pour les rappels manuels
+        rappel.setStatut(StatutRappel.ENVOYE);
+        rappel.setUtilisateur(utilisateur);
+        
+        log.info("Création rappel manuel pour utilisateur {} - Date: {} à {}", 
+                utilisateur.getId(), date, heure);
+        
+        return rappelRepository.save(rappel);
     }
 }
 

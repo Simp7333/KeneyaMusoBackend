@@ -1,5 +1,6 @@
 package com.keneyamuso.controller;
 
+import com.keneyamuso.dto.request.RappelManuelRequest;
 import com.keneyamuso.dto.response.ApiResponse;
 import com.keneyamuso.exception.ResourceNotFoundException;
 import com.keneyamuso.model.entity.Rappel;
@@ -11,6 +12,7 @@ import com.keneyamuso.service.RappelService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -224,6 +226,37 @@ public class NotificationController {
         
         return ResponseEntity.ok(ApiResponse.success(
                 "Rappel reprogrammé au " + nouvelleDate, null));
+    }
+
+    /**
+     * Créer un rappel manuel
+     * Permet à l'utilisateur de créer un rappel personnalisé avec titre, date et heure
+     */
+    @PostMapping("/manuel")
+    @Operation(
+            summary = "Créer un rappel manuel",
+            description = "Crée un rappel personnalisé avec un titre, une date et une heure"
+    )
+    @Transactional
+    public ResponseEntity<ApiResponse<Map<String, Object>>> creerRappelManuel(
+            @Valid @RequestBody RappelManuelRequest request,
+            Authentication authentication) {
+        
+        String telephone = authentication.getName();
+        Utilisateur utilisateur = utilisateurRepository.findByTelephone(telephone)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", "telephone", telephone));
+        
+        Rappel rappel = rappelService.creerRappelManuel(
+                utilisateur,
+                request.getTitre(),
+                request.getDate(),
+                request.getHeure()
+        );
+        
+        Map<String, Object> notification = rappelService.rappelToNotificationMap(rappel);
+        
+        return ResponseEntity.ok(ApiResponse.success(
+                "Rappel créé avec succès", notification));
     }
 }
 

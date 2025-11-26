@@ -7,6 +7,7 @@ public enum TypeRappel {
     CPN,
     CPON,
     VACCINATION,
-    CONSEIL
+    CONSEIL,
+    DEMANDE_ASSIGNATION
 }
 

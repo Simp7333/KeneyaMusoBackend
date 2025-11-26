@@ -1,5 +1,6 @@
 package com.keneyamuso.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.keneyamuso.model.enums.StatutConsultation;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -37,9 +38,11 @@ public class ConsultationPrenatale {
     private LocalDate dateRealisee;
 
     @OneToOne(mappedBy = "consultationPrenatale", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
     private SuiviConsultation suiviConsultation;
 
     @OneToOne(mappedBy = "consultationPrenatale", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
     private Ordonnance ordonnance;
 
     @Column(length = 1000)
@@ -60,9 +63,11 @@ public class ConsultationPrenatale {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "grossesse_id", nullable = false)
+    @JsonIgnore
     private Grossesse grossesse;
 
     @OneToMany(mappedBy = "consultationPrenatale", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Rappel> rappels = new ArrayList<>();
 
     @CreatedDate
