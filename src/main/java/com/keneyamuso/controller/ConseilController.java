@@ -8,6 +8,7 @@ import com.keneyamuso.model.entity.Utilisateur;
 import com.keneyamuso.model.enums.RoleUtilisateur;
 import com.keneyamuso.repository.UtilisateurRepository;
 import com.keneyamuso.service.ConseilService;
+import com.keneyamuso.service.file.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,8 +18,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller pour la gestion des conseils éducatifs
@@ -32,6 +36,44 @@ public class ConseilController {
 
     private final ConseilService conseilService;
     private final UtilisateurRepository utilisateurRepository;
+    private final FileStorageService fileStorageService;
+
+    @PostMapping("/upload/video")
+    @Operation(summary = "Uploader une vidéo", description = "Upload une vidéo et retourne l'URL du fichier")
+    @PreAuthorize("hasAnyRole('MEDECIN', 'ADMINISTRATEUR')")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadVideo(@RequestParam("file") MultipartFile file) {
+        try {
+            // Vérifier que c'est bien une vidéo
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("video/")) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Le fichier doit être une vidéo"));
+            }
+
+            // Vérifier la taille du fichier (max 100MB)
+            long maxSize = 100 * 1024 * 1024; // 100MB
+            if (file.getSize() > maxSize) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("La vidéo ne doit pas dépasser 100MB"));
+            }
+
+            // Stocker le fichier
+            String fileName = fileStorageService.storeFile(file);
+            
+            // Construire l'URL du fichier
+            String fileUrl = "/uploads/" + fileName;
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("fileName", fileName);
+            response.put("fileUrl", fileUrl);
+            response.put("originalFileName", file.getOriginalFilename());
+            
+            return ResponseEntity.ok(ApiResponse.success("Vidéo uploadée avec succès", response));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors de l'upload de la vidéo: " + e.getMessage()));
+        }
+    }
 
     @PostMapping
     @Operation(summary = "Créer un conseil", description = "Ajoute un nouveau contenu éducatif")

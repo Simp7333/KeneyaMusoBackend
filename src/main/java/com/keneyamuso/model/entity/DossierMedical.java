@@ -8,8 +8,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "dossiers_medicaux")
@@ -36,11 +36,12 @@ public class DossierMedical {
     @Column(columnDefinition = "TEXT")
     private String allergies;
 
+    // Changé de List à Set pour éviter MultipleBagFetchException avec @EntityGraph
     @OneToMany(mappedBy = "dossierMedical", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<FormulaireCPN> formulairesCPN = new ArrayList<>();
+    private Set<FormulaireCPN> formulairesCPN = new HashSet<>();
 
     @OneToMany(mappedBy = "dossierMedical", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<FormulaireCPON> formulairesCPON = new ArrayList<>();
+    private Set<FormulaireCPON> formulairesCPON = new HashSet<>();
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
