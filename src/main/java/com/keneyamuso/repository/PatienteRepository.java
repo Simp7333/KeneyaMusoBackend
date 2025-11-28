@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,4 +68,17 @@ public interface PatienteRepository extends JpaRepository<Patiente, Long> {
     @Query("SELECT DISTINCT p FROM Patiente p LEFT JOIN FETCH p.enfants")
     List<Patiente> findAllWithEnfants();
     // ================================================
+    
+    // === MÉTHODES POUR REPORTS ===
+    @Query("SELECT COUNT(p) FROM Patiente p WHERE p.dateCreation BETWEEN :startDate AND :endDate")
+    long countByDateCreationBetween(@Param("startDate") LocalDateTime startDate, 
+                                     @Param("endDate") LocalDateTime endDate);
+    
+    @Query("SELECT p FROM Patiente p ORDER BY p.dateCreation DESC")
+    List<Patiente> findAllByOrderByDateCreationDesc();
+    
+    @Query("SELECT COUNT(DISTINCT p.id) FROM Patiente p " +
+           "WHERE EXISTS (SELECT 1 FROM ConsultationPrenatale cpn WHERE cpn.grossesse.patiente.id = p.id) " +
+           "OR EXISTS (SELECT 1 FROM ConsultationPostnatale cpon WHERE cpon.patiente.id = p.id)")
+    long countDistinctPatientesWithConsultations();
 }

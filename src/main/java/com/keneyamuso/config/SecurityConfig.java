@@ -67,6 +67,7 @@ public class SecurityConfig {
                         // Endpoints publics
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/messages/download/**").permitAll()  // Téléchargement de fichiers
+                        .requestMatchers("/uploads/**").permitAll()  // Accès aux fichiers uploadés (vidéos, images)
                         .requestMatchers("/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers("/swagger-ui.html").permitAll()
@@ -88,14 +89,34 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Autoriser toutes les origines pour le développement
+        
+        // Autoriser les origines pour le développement
         // En production, spécifiez des origines précises
-        configuration.setAllowedOrigins(List.of("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:4200",  // Angular dev server
+            "http://localhost:3000",  // Autres serveurs de dev possibles
+            "http://127.0.0.1:4200"
+        ));
+        
+        // Pour autoriser toutes les origines en développement (sans credentials)
+        // Décommentez la ligne suivante et commentez setAllowedOrigins ci-dessus
+        // configuration.setAllowedOriginPatterns(List.of("*"));
+        
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            "Accept",
+            "Origin",
+            "Access-Control-Request-Method",
+            "Access-Control-Request-Headers"
+        ));
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        // Autoriser les credentials si nécessaire
-        configuration.setAllowCredentials(false);
+        
+        // Autoriser les credentials (nécessite des origines spécifiques, pas "*")
+        configuration.setAllowCredentials(true);
+        
         // Max age pour les preflight requests (1 heure)
         configuration.setMaxAge(3600L);
 
