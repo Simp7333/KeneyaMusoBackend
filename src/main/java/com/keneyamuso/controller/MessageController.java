@@ -118,9 +118,34 @@ public class MessageController {
         try {
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists()) {
+                // Détecter le type MIME selon l'extension du fichier
+                String contentType = "application/octet-stream";
+                String contentDisposition = "inline"; // inline pour permettre la lecture directe
+                
+                String lowerFileName = fileName.toLowerCase();
+                if (lowerFileName.endsWith(".m4a") || lowerFileName.endsWith(".mp4")) {
+                    contentType = "audio/mp4";
+                } else if (lowerFileName.endsWith(".mp3")) {
+                    contentType = "audio/mpeg";
+                } else if (lowerFileName.endsWith(".wav")) {
+                    contentType = "audio/wav";
+                } else if (lowerFileName.endsWith(".ogg")) {
+                    contentType = "audio/ogg";
+                } else if (lowerFileName.endsWith(".jpg") || lowerFileName.endsWith(".jpeg")) {
+                    contentType = "image/jpeg";
+                } else if (lowerFileName.endsWith(".png")) {
+                    contentType = "image/png";
+                } else if (lowerFileName.endsWith(".gif")) {
+                    contentType = "image/gif";
+                } else if (lowerFileName.endsWith(".pdf")) {
+                    contentType = "application/pdf";
+                    contentDisposition = "attachment"; // Les PDFs sont téléchargés
+                }
+                
                 return ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType("application/octet-stream"))
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition + "; filename=\"" + resource.getFilename() + "\"")
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes") // Permet la lecture en streaming
                         .body(resource);
             } else {
                 return ResponseEntity.notFound().build();

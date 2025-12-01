@@ -80,10 +80,16 @@ public class DossierMedicalSubmissionController {
             @PathVariable Long submissionId,
             @RequestBody(required = false) SubmissionApprovalRequest request,
             Authentication authentication) {
-        Long medecinId = submissionService.getMedecinIdFromTelephone(authentication.getName());
-        String commentaire = request != null ? request.getCommentaire() : null;
-        submissionService.approveSubmission(submissionId, medecinId, commentaire);
-        return ResponseEntity.ok(ApiResponse.success("Soumission approuvée", null));
+        try {
+            Long medecinId = submissionService.getMedecinIdFromTelephone(authentication.getName());
+            String commentaire = request != null ? request.getCommentaire() : null;
+            submissionService.approveSubmission(submissionId, medecinId, commentaire);
+            return ResponseEntity.ok(ApiResponse.success("Soumission approuvée avec succès", null));
+        } catch (Exception e) {
+            // Les exceptions seront gérées par le GlobalExceptionHandler
+            // On les relance pour qu'elles soient capturées
+            throw e;
+        }
     }
 
     @PostMapping("/{submissionId}/reject")

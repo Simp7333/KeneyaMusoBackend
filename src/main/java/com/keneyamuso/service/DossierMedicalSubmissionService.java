@@ -33,6 +33,8 @@ public class DossierMedicalSubmissionService {
     private final ProfessionnelSanteRepository professionnelSanteRepository;
     private final DossierMedicalService dossierMedicalService;
     private final DossierMedicalRepository dossierMedicalRepository;
+    private final FormulaireCPNRepository formulaireCPNRepository;
+    private final FormulaireCPONRepository formulaireCPONRepository;
     private final ObjectMapper objectMapper;
     private final RappelRepository rappelRepository;
 
@@ -179,52 +181,94 @@ public class DossierMedicalSubmissionService {
 
     @Transactional
     public void approveSubmission(Long submissionId, Long medecinId, String commentaire) {
-        DossierMedicalSubmission submission = getSubmissionById(submissionId);
-
-        if (submission.getStatus() != SubmissionStatus.EN_ATTENTE) {
-            throw new BadRequestException("Cette demande a déjà été traitée.");
-        }
-
-        // Vérifier si le médecin est autorisé à traiter cette soumission
-        checkMedecinAuthorization(submission, medecinId);
-
-        // Récupérer le médecin qui approuve
-        ProfessionnelSante medecin = professionnelSanteRepository.findById(medecinId)
-                .orElseThrow(() -> new ResourceNotFoundException("Professionnel de santé", "id", medecinId));
+        log.info("🚀 Début de l'approbation - Submission ID: {}, Médecin ID: {}", submissionId, medecinId);
         
-        // Si la soumission n'a pas de médecin assigné, l'assigner maintenant
-        if (submission.getProfessionnelSante() == null) {
-            submission.setProfessionnelSante(medecin);
-            log.info("Médecin {} assigné à la soumission {} après acceptation", medecinId, submissionId);
-        }
-        
-        // Assigner le médecin à la patiente (toujours lors de l'acceptation, même si déjà assigné à la soumission)
-        Patiente patiente = submission.getPatiente();
-        if (patiente.getProfessionnelSanteAssigne() == null || 
-            !patiente.getProfessionnelSanteAssigne().getId().equals(medecinId)) {
-            patiente.setProfessionnelSanteAssigne(medecin);
-            patienteRepository.save(patiente);
-            log.info("Médecin {} assigné à la patiente {} après acceptation de la soumission", medecinId, patiente.getId());
-        } else {
-            log.info("Médecin {} était déjà assigné à la patiente {}", medecinId, patiente.getId());
-        }
-
         try {
-            switch (submission.getType()) {
-                case CPN -> traiterSoumissionCpn(submission);
-                case CPON -> traiterSoumissionCpon(submission);
+            DossierMedicalSubmission submission = getSubmissionById(submissionId);
+            log.info("✅ Soumission trouvée - Type: {}, Statut: {}, Patiente ID: {}", 
+                    submission.getType(), submission.getStatus(), submission.getPatiente().getId());
+
+            if (submission.getStatus() != SubmissionStatus.EN_ATTENTE) {
+                log.warn("⚠️ La soumission {} a déjà été traitée - Statut actuel: {}", submissionId, submission.getStatus());
+                throw new BadRequestException("Cette demande a déjà été traitée.");
             }
-        } catch (JsonProcessingException e) {
-            log.error("Erreur de parsing du formulaire", e);
-            throw new BadRequestException("Données du formulaire invalides");
+
+            // Vérifier si le médecin est autorisé à traiter cette soumission
+            checkMedecinAuthorization(submission, medecinId);
+            log.info("✅ Autorisation du médecin vérifiée");
+
+            // Récupérer le médecin qui approuve
+            ProfessionnelSante medecin = professionnelSanteRepository.findById(medecinId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Professionnel de santé", "id", medecinId));
+            log.info("✅ Médecin trouvé - ID: {}, Nom: {}", medecinId, medecin.getNom() + " " + medecin.getPrenom());
+            
+            // Si la soumission n'a pas de médecin assigné, l'assigner maintenant
+            if (submission.getProfessionnelSante() == null) {
+                submission.setProfessionnelSante(medecin);
+                log.info("✅ Médecin {} assigné à la soumission {} après acceptation", medecinId, submissionId);
+            }
+            
+            // Assigner le médecin à la patiente (toujours lors de l'acceptation, même si déjà assigné à la soumission)
+            Patiente patiente = submission.getPatiente();
+            if (patiente.getProfessionnelSanteAssigne() == null || 
+                !patiente.getProfessionnelSanteAssigne().getId().equals(medecinId)) {
+                patiente.setProfessionnelSanteAssigne(medecin);
+                patienteRepository.save(patiente);
+                log.info("✅ Médecin {} assigné à la patiente {} après acceptation de la soumission", medecinId, patiente.getId());
+            } else {
+                log.info("ℹ️ Médecin {} était déjà assigné à la patiente {}", medecinId, patiente.getId());
+            }
+
+            // Traiter le formulaire selon le type
+            log.info("📝 Début du traitement du formulaire - Type: {}", submission.getType());
+            try {
+                switch (submission.getType()) {
+                    case CPN -> {
+                        log.info("📋 Traitement du formulaire CPN...");
+                        traiterSoumissionCpn(submission);
+                        log.info("✅ Formulaire CPN traité avec succès");
+                    }
+                    case CPON -> {
+                        log.info("📋 Traitement du formulaire CPON...");
+                        traiterSoumissionCpon(submission);
+                        log.info("✅ Formulaire CPON traité avec succès");
+                    }
+                }
+            } catch (JsonProcessingException e) {
+                log.error("❌ Erreur de parsing du formulaire JSON", e);
+                log.error("❌ Payload qui a causé l'erreur: {}", submission.getPayload());
+                throw new BadRequestException("Données du formulaire invalides: " + e.getMessage());
+            } catch (Exception e) {
+                log.error("❌ Erreur inattendue lors du traitement du formulaire", e);
+                throw new BadRequestException("Erreur lors du traitement du formulaire: " + e.getMessage());
+            }
+
+            // Mettre à jour le statut de la soumission
+            log.info("💾 Mise à jour du statut de la soumission...");
+            submission.setStatus(SubmissionStatus.APPROUVEE);
+            submission.setRemarqueMedecin(commentaire);
+            submissionRepository.save(submission);
+            log.info("✅ Statut de la soumission mis à jour: APPROUVEE");
+
+            // Envoyer une alerte à la patiente
+            log.info("📧 Envoi de l'alerte d'approbation à la patiente...");
+            try {
+                envoyerAlerteApprobation(submission);
+                log.info("✅ Alerte d'approbation envoyée");
+            } catch (Exception e) {
+                log.error("⚠️ Erreur lors de l'envoi de l'alerte (non bloquant)", e);
+                // Ne pas bloquer l'approbation si l'alerte échoue
+            }
+            
+            log.info("🎉 Approbation terminée avec succès - Submission ID: {}", submissionId);
+            
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.error("❌ Erreur métier lors de l'approbation: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ Erreur inattendue lors de l'approbation - Submission ID: {}", submissionId, e);
+            throw new BadRequestException("Erreur lors de l'approbation: " + e.getMessage());
         }
-
-        submission.setStatus(SubmissionStatus.APPROUVEE);
-        submission.setRemarqueMedecin(commentaire);
-        submissionRepository.save(submission);
-
-        // Envoyer une alerte à la patiente
-        envoyerAlerteApprobation(submission);
     }
 
     @Transactional
@@ -264,8 +308,19 @@ public class DossierMedicalSubmissionService {
     }
 
     private void traiterSoumissionCpn(DossierMedicalSubmission submission) throws JsonProcessingException {
-        FormulaireCPNRequest request = objectMapper.readValue(submission.getPayload(), FormulaireCPNRequest.class);
+        log.info("📄 Parsing du payload CPN pour la soumission {}", submission.getId());
+        log.debug("Payload JSON: {}", submission.getPayload());
+        
+        FormulaireCPNRequest request;
+        try {
+            request = objectMapper.readValue(submission.getPayload(), FormulaireCPNRequest.class);
+            log.info("✅ Payload CPN parsé avec succès");
+        } catch (Exception e) {
+            log.error("❌ Erreur lors du parsing du payload CPN", e);
+            throw e;
+        }
 
+        log.info("📝 Création du formulaire CPN à partir de la requête...");
         FormulaireCPN formulaire = new FormulaireCPN();
         formulaire.setTaille(request.getTaille());
         formulaire.setPoids(request.getPoids());
@@ -282,14 +337,39 @@ public class DossierMedicalSubmissionService {
         formulaire.setMedicamentsOuVitaminesDetails(request.getMedicamentsOuVitaminesDetails());
         formulaire.setAEuMaladies(request.isAEuMaladies());
         formulaire.setMaladiesDetails(request.getMaladiesDetails());
+        log.info("✅ Formulaire CPN créé - Taille: {}, Poids: {}, Mois: {}", 
+                request.getTaille(), request.getPoids(), request.getNombreMoisGrossesse());
 
-        ensureDossierMedicalExists(submission.getPatiente().getId());
-        dossierMedicalService.addFormulaireCPN(submission.getPatiente().getId(), formulaire);
+        Long patienteId = submission.getPatiente().getId();
+        log.info("🔍 Vérification du dossier médical pour la patiente {}", patienteId);
+        DossierMedical dossierMedical = ensureDossierMedicalExists(patienteId);
+        
+        log.info("💾 Ajout du formulaire CPN au dossier médical...");
+        try {
+            // Utiliser directement le dossier médical récupéré au lieu de le rechercher à nouveau
+            formulaire.setDossierMedical(dossierMedical);
+            FormulaireCPN savedFormulaire = formulaireCPNRepository.save(formulaire);
+            log.info("✅ Formulaire CPN ajouté avec succès - ID: {}", savedFormulaire.getId());
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de l'ajout du formulaire CPN au dossier médical", e);
+            throw new BadRequestException("Erreur lors de l'ajout du formulaire CPN: " + e.getMessage());
+        }
     }
 
     private void traiterSoumissionCpon(DossierMedicalSubmission submission) throws JsonProcessingException {
-        FormulaireCPONRequest request = objectMapper.readValue(submission.getPayload(), FormulaireCPONRequest.class);
+        log.info("📄 Parsing du payload CPON pour la soumission {}", submission.getId());
+        log.debug("Payload JSON: {}", submission.getPayload());
+        
+        FormulaireCPONRequest request;
+        try {
+            request = objectMapper.readValue(submission.getPayload(), FormulaireCPONRequest.class);
+            log.info("✅ Payload CPON parsé avec succès");
+        } catch (Exception e) {
+            log.error("❌ Erreur lors du parsing du payload CPON", e);
+            throw e;
+        }
 
+        log.info("📝 Création du formulaire CPON à partir de la requête...");
         FormulaireCPON formulaire = new FormulaireCPON();
         formulaire.setAccouchementType(request.getAccouchementType());
         formulaire.setNombreEnfants(request.getNombreEnfants());
@@ -298,42 +378,62 @@ public class DossierMedicalSubmissionService {
         formulaire.setConsultation(request.getConsultation());
         formulaire.setSexeBebe(request.getSexeBebe());
         formulaire.setAlimentation(request.getAlimentation());
+        log.info("✅ Formulaire CPON créé - Type accouchement: {}, Nombre enfants: {}", 
+                request.getAccouchementType(), request.getNombreEnfants());
 
-        ensureDossierMedicalExists(submission.getPatiente().getId());
-        dossierMedicalService.addFormulaireCPON(submission.getPatiente().getId(), formulaire);
+        Long patienteId = submission.getPatiente().getId();
+        log.info("🔍 Vérification du dossier médical pour la patiente {}", patienteId);
+        DossierMedical dossierMedical = ensureDossierMedicalExists(patienteId);
+        
+        log.info("💾 Ajout du formulaire CPON au dossier médical...");
+        try {
+            // Utiliser directement le dossier médical récupéré au lieu de le rechercher à nouveau
+            formulaire.setDossierMedical(dossierMedical);
+            FormulaireCPON savedFormulaire = formulaireCPONRepository.save(formulaire);
+            log.info("✅ Formulaire CPON ajouté avec succès - ID: {}", savedFormulaire.getId());
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de l'ajout du formulaire CPON au dossier médical", e);
+            throw new BadRequestException("Erreur lors de l'ajout du formulaire CPON: " + e.getMessage());
+        }
     }
 
-    private void ensureDossierMedicalExists(Long patienteId) {
+    private DossierMedical ensureDossierMedicalExists(Long patienteId) {
         log.info("🔍 Vérification de l'existence du dossier médical pour la patiente {}", patienteId);
         
         // Vérifier si le dossier existe déjà
         var dossierOptional = dossierMedicalRepository.findByPatienteId(patienteId);
         
-        if (dossierOptional.isEmpty()) {
-            // Créer le dossier s'il n'existe pas
-            log.info("📋 Aucun dossier médical trouvé. Création pour la patiente {}", patienteId);
-            try {
-                DossierMedical nouveauDossier = dossierMedicalService.createDossierMedical(patienteId);
-                log.info("✅ Dossier médical créé avec succès - ID: {} pour la patiente {}", 
-                         nouveauDossier.getId(), patienteId);
-            } catch (IllegalStateException e) {
-                // Le dossier existe déjà (race condition possible)
-                log.warn("⚠️ Le dossier médical existe déjà pour la patiente {} (race condition détectée): {}", 
-                         patienteId, e.getMessage());
-                // Vérifier à nouveau pour confirmer
-                var dossierVerif = dossierMedicalRepository.findByPatienteId(patienteId);
-                if (dossierVerif.isEmpty()) {
-                    log.error("❌ ERREUR CRITIQUE: Impossible de créer ou trouver le dossier médical pour la patiente {}", patienteId);
-                    throw new IllegalStateException("Impossible de créer le dossier médical pour la patiente " + patienteId);
-                }
-            } catch (Exception e) {
-                log.error("❌ Erreur inattendue lors de la création du dossier médical pour la patiente {}: {}", 
-                         patienteId, e.getMessage(), e);
-                throw e;
-            }
-        } else {
+        if (dossierOptional.isPresent()) {
+            DossierMedical dossier = dossierOptional.get();
             log.info("✅ Dossier médical existant trouvé - ID: {} pour la patiente {}", 
-                     dossierOptional.get().getId(), patienteId);
+                     dossier.getId(), patienteId);
+            return dossier;
+        }
+        
+        // Créer le dossier s'il n'existe pas
+        log.info("📋 Aucun dossier médical trouvé. Création pour la patiente {}", patienteId);
+        try {
+            DossierMedical nouveauDossier = dossierMedicalService.createDossierMedical(patienteId);
+            // Flush explicitement pour s'assurer que le dossier est persistant
+            dossierMedicalRepository.flush();
+            log.info("✅ Dossier médical créé avec succès - ID: {} pour la patiente {}", 
+                     nouveauDossier.getId(), patienteId);
+            return nouveauDossier;
+        } catch (IllegalStateException e) {
+            // Le dossier existe déjà (race condition possible)
+            log.warn("⚠️ Le dossier médical existe déjà pour la patiente {} (race condition détectée): {}", 
+                     patienteId, e.getMessage());
+            // Vérifier à nouveau pour confirmer
+            var dossierVerif = dossierMedicalRepository.findByPatienteId(patienteId);
+            if (dossierVerif.isEmpty()) {
+                log.error("❌ ERREUR CRITIQUE: Impossible de créer ou trouver le dossier médical pour la patiente {}", patienteId);
+                throw new IllegalStateException("Impossible de créer le dossier médical pour la patiente " + patienteId);
+            }
+            return dossierVerif.get();
+        } catch (Exception e) {
+            log.error("❌ Erreur inattendue lors de la création du dossier médical pour la patiente {}: {}", 
+                     patienteId, e.getMessage(), e);
+            throw e;
         }
     }
 
