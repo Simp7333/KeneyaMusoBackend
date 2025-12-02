@@ -1,6 +1,7 @@
 // src/main/java/com/keneyamuso/controller/DashboardController.java
 package com.keneyamuso.controller;
 
+import com.keneyamuso.dto.response.AdminDashboardStats;
 import com.keneyamuso.dto.response.ApiResponse;
 import com.keneyamuso.dto.response.DashboardStatsResponse;
 import com.keneyamuso.dto.response.PatienteListDto;
@@ -15,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -76,13 +76,13 @@ public class DashboardController {
     @GetMapping("/admin")
     @Operation(
             summary = "Statistiques du tableau de bord administrateur",
-            description = "Retourne les statistiques globales : total patientes, professionnels, grossesses, enfants, rappels"
+            description = "Retourne les statistiques globales : total patientes, professionnels, grossesses, enfants, rappels, taux CPN et vaccinations"
     )
     @PreAuthorize("hasRole('ADMINISTRATEUR')")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAdminDashboardStats(
+    public ResponseEntity<ApiResponse<AdminDashboardStats>> getAdminDashboardStats(
             Authentication authentication) {
         
-        Map<String, Object> stats = dashboardService.getAdminDashboardStats();
+        AdminDashboardStats stats = dashboardService.getAdminDashboardStats();
         
         return ResponseEntity.ok(
                 ApiResponse.success("Statistiques récupérées avec succès", stats)

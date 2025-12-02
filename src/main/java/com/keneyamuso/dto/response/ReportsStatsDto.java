@@ -40,6 +40,11 @@ public class ReportsStatsDto {
     // Consultations récentes
     private List<ConsultationReportDto> consultationsRecentes;
     
+    // Nouvelles données pour les rapports CPN/CPON
+    private RepartitionCpnCponDto repartitionCpnCpon; // Répartition CPN/CPON
+    private List<TrimestreData> cpnParTrimestre; // CPN par trimestre de grossesse
+    private List<MonthlyDetailData> monthlyDetailData; // Détails mensuels CPN/CPON pour l'année sélectionnée
+    
     @Data
     @Builder
     @NoArgsConstructor
@@ -47,6 +52,40 @@ public class ReportsStatsDto {
     public static class MonthlyData {
         private String mois; // "Jan", "Fév", etc.
         private Long nombre;
+    }
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RepartitionCpnCponDto {
+        private Long cpnRealisees;
+        private Long cponRealisees;
+        private Long cpnManquees;
+        private Long cponManquees;
+    }
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TrimestreData {
+        private String trimestre; // "1er Trimestre", "2ème Trimestre", "3ème Trimestre"
+        private Long cpnRealisees;
+        private Long cpnManquees;
+    }
+    
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MonthlyDetailData {
+        private String nom; // "Janvier", "Fevrier", etc.
+        private Long cpnRealisees;
+        private Long cpnManquees;
+        private Long cponRealisees;
+        private Long cponManquees;
+        private String tauxReussite; // "81,1" format string avec virgule
     }
     
     @Data

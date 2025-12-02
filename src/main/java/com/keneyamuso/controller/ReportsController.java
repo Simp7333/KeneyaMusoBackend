@@ -27,13 +27,15 @@ public class ReportsController {
     @Operation(
             summary = "Obtenir les statistiques de rapports",
             description = "Retourne toutes les statistiques détaillées pour les rapports : stats principales, graphiques, listes de patientes et consultations. " +
-                    "Paramètre period: 'week', 'month', 'quarter', 'year' (défaut: 'month')"
+                    "Paramètre period: 'week', 'month', 'quarter', 'year' (défaut: 'month'). " +
+                    "Paramètre year: année pour filtrer les données mensuelles (optionnel, défaut: année actuelle)."
     )
     @PreAuthorize("hasRole('ADMINISTRATEUR')")
     public ResponseEntity<ApiResponse<ReportsStatsDto>> getReportsStats(
-            @RequestParam(value = "period", required = false, defaultValue = "month") String period) {
+            @RequestParam(value = "period", required = false, defaultValue = "month") String period,
+            @RequestParam(value = "year", required = false) Integer year) {
         
-        ReportsStatsDto stats = reportsService.getReportsStats(period);
+        ReportsStatsDto stats = reportsService.getReportsStats(period, year);
         
         return ResponseEntity.ok(
                 ApiResponse.success("Statistiques de rapports récupérées avec succès", stats)

@@ -1,5 +1,6 @@
 package com.keneyamuso.service;
 
+import com.keneyamuso.dto.response.AdminDashboardStats;
 import com.keneyamuso.dto.response.DashboardStatsResponse;
 import com.keneyamuso.dto.response.PatienteListDto;
 import com.keneyamuso.exception.BadRequestException;
@@ -7,14 +8,18 @@ import com.keneyamuso.exception.ResourceNotFoundException;
 import com.keneyamuso.model.entity.Patiente;
 import com.keneyamuso.model.entity.ProfessionnelSante;
 import com.keneyamuso.model.entity.Utilisateur;
+import com.keneyamuso.model.enums.StatutConsultation;
 import com.keneyamuso.model.enums.StatutRappel;
+import com.keneyamuso.model.enums.StatutVaccination;
 import com.keneyamuso.model.enums.SubmissionStatus;
+import com.keneyamuso.repository.ConsultationPrenataleRepository;
 import com.keneyamuso.repository.DossierMedicalSubmissionRepository;
 import com.keneyamuso.repository.EnfantRepository;
 import com.keneyamuso.repository.GrossesseRepository;
 import com.keneyamuso.repository.PatienteRepository;
 import com.keneyamuso.repository.RappelRepository;
 import com.keneyamuso.repository.UtilisateurRepository;
+import com.keneyamuso.repository.VaccinationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +38,8 @@ public class DashboardService {
     private final DossierMedicalSubmissionService dossierMedicalSubmissionService;
     private final GrossesseRepository grossesseRepository;
     private final EnfantRepository enfantRepository;
+    private final ConsultationPrenataleRepository consultationPrenataleRepository;
+    private final VaccinationRepository vaccinationRepository;
 
     // ====================== STATS DU MÉDECIN ======================
     @Transactional(readOnly = true)
@@ -78,7 +85,7 @@ public class DashboardService {
 
     // ====================== STATS ADMIN ======================
     @Transactional(readOnly = true)
-    public Map<String, Object> getAdminDashboardStats() {
+    public AdminDashboardStats getAdminDashboardStats() {
         // Total patientes
         long totalPatientes = patienteRepository.count();
         
@@ -103,21 +110,32 @@ public class DashboardService {
         // Total rappels envoyés (tous les rappels)
         long totalRappelsEnvoyes = rappelRepository.count();
         
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalPatientes", totalPatientes);
-        stats.put("totalProfessionnels", totalProfessionnels);
-        stats.put("totalGrossessesEnCours", totalGrossessesEnCours);
-        stats.put("totalGrossessesTerminees", totalGrossessesTerminees);
-        stats.put("totalEnfants", totalEnfants);
-        stats.put("totalRappelsEnvoyes", totalRappelsEnvoyes);
+        // Calculer le pourcentage CPN respectées
+        long totalCpn = consultationPrenataleRepository.count();
+        long cpnRealisees = consultationPrenataleRepository.findByStatut(StatutConsultation.REALISEE).size();
+        Double cpnRespectRate = null;
+        if (totalCpn > 0) {
+            cpnRespectRate = Math.round((cpnRealisees * 100.0 / totalCpn) * 10.0) / 10.0;
+        }
         
-        // Pourcentage CPN respectées (calcul simplifié - à améliorer selon la logique métier)
-        // stats.put("cpnRespectRate", 78); // TODO: Calculer selon la logique métier
+        // Calculer le pourcentage vaccinations à jour
+        long totalVaccinations = vaccinationRepository.count();
+        long vaccinationsFaites = vaccinationRepository.findByStatut(StatutVaccination.FAIT).size();
+        Double vaccinationRate = null;
+        if (totalVaccinations > 0) {
+            vaccinationRate = Math.round((vaccinationsFaites * 100.0 / totalVaccinations) * 10.0) / 10.0;
+        }
         
-        // Pourcentage vaccinations à jour (calcul simplifié - à améliorer selon la logique métier)
-        // stats.put("vaccinationRate", 72); // TODO: Calculer selon la logique métier
-        
-        return stats;
+        return AdminDashboardStats.builder()
+                .totalPatientes(totalPatientes)
+                .totalProfessionnels(totalProfessionnels)
+                .totalGrossessesEnCours(totalGrossessesEnCours)
+                .totalGrossessesTerminees(totalGrossessesTerminees)
+                .totalEnfants(totalEnfants)
+                .cpnRespectRate(cpnRespectRate)
+                .vaccinationRate(vaccinationRate)
+                .totalRappelsEnvoyes(totalRappelsEnvoyes)
+                .build();
     }
 
     // ====================== LISTE DES PATIENTES ======================
